@@ -1,0 +1,26 @@
+[package]
+name = "interedy"
+version = "0.1.0"
+description = "Redis Manager powered by Tauri"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "interedy_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+redis = { version = "0.27", features = ["tokio-comp"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+dirs = "5"
+shell-words = "1"

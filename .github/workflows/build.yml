@@ -1,0 +1,227 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+            rustTarget: "x86_64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            rustTarget: "aarch64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+            rustTarget: "x86_64-unknown-linux-gnu"
+          - platform: "windows-latest"
+            args: ""
+            rustTarget: "x86_64-pc-windows-msvc"
+
+    runs-on: ${{ matrix.platform }}
+    name: Build on ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rustTarget }}
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf rpm
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Extract version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        id: extract_version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update version in Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          if [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
+            sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          else
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          fi
+
+      - name: Update version in tauri.conf.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8')); config.version = '$VERSION'; fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(config, null, 2) + '\n');"
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          projectPath: ./src-tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "Interedy v__VERSION__"
+          releaseBody: "See the assets to download this version and install."
+          releaseDraft: ${{ github.event_name != 'pull_request' }}
+          prerelease: false
+          updater: true
+
+  generate-updater-json:
+    needs: build-tauri
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate updater JSON
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.extract_version.outputs.version }}
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+
+          # Get release info
+          RELEASE_INFO=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO/releases/tags/$TAG_NAME")
+
+          PUB_DATE=$(echo "$RELEASE_INFO" | jq -r '.published_at')
+          NOTES=$(echo "$RELEASE_INFO" | jq -r '.body // "See the assets to download this version and install."')
+
+          # Get all assets
+          ASSETS=$(echo "$RELEASE_INFO" | jq '[.assets[] | {name: .name, url: .browser_download_url}]')
+
+          # Match platforms
+          PLATFORMS=$(echo "$ASSETS" | jq '
+            map(select(.name | test("\\.(dmg|appimage|deb|rpm|exe|msi)$"; "i"))) |
+            map(. as $installer | {
+              name: $installer.name,
+              url: $installer.url,
+              platform: (
+                if ($installer.name | test(".*_aarch64_darwin|.*aarch64.*darwin"; "i")) then "darwin-aarch64"
+                elif ($installer.name | test(".*_x64_darwin|.*x64.*darwin"; "i")) then "darwin-x86_64"
+                elif ($installer.name | test(".*_amd64_linux|.*amd64.*linux"; "i")) then "linux-x86_64"
+                elif ($installer.name | test(".*_x86_64_linux|.*x86_64.*linux"; "i")) then "linux-x86_64"
+                elif ($installer.name | test(".*_x64.*windows|.*x64.*windows"; "i")) then "windows-x86_64"
+                elif ($installer.name | test(".*_x86_64.*windows|.*x86_64.*windows"; "i")) then "windows-x86_64"
+                elif ($installer.name | test("\\.dmg$"; "i")) then
+                  if ($installer.name | test("aarch64|arm64"; "i")) then "darwin-aarch64"
+                  else "darwin-x86_64"
+                  end
+                elif ($installer.name | test("\\.(deb|rpm|appimage)$"; "i")) then "linux-x86_64"
+                elif ($installer.name | test("\\.(exe|msi)$"; "i")) then "windows-x86_64"
+                else empty
+                end
+              )
+            }) |
+            map(select(.platform != null)) |
+            reduce .[] as $item ({};
+              if has($item.platform) then .
+              else . + {($item.platform): {url: $item.url, name: $item.name}}
+              end
+            )
+          ')
+
+          if [ -z "$PLATFORMS" ] || [ "$PLATFORMS" = "null" ]; then
+            PLATFORMS="{}"
+          fi
+
+          # Download signature files and build final platforms object
+          echo "$PLATFORMS" > /tmp/platforms_temp.json
+          echo "$PLATFORMS" | jq -c 'to_entries[]' | while read -r entry; do
+            PLATFORM=$(echo "$entry" | jq -r '.key')
+            INSTALLER_URL=$(echo "$entry" | jq -r '.value.url')
+            INSTALLER_NAME=$(echo "$entry" | jq -r '.value.name // empty')
+
+            # Find matching .sig file
+            SIG_URL=$(echo "$ASSETS" | jq -r --arg sig_name "${INSTALLER_NAME}.sig" '.[] | select(.name == $sig_name) | .url // empty')
+
+            if [ -n "$SIG_URL" ] && [ "$SIG_URL" != "" ]; then
+              SIG_CONTENT=$(curl -sL -f -H "Authorization: token $GITHUB_TOKEN" "$SIG_URL" 2>&1)
+              if [ $? -eq 0 ] && [ -n "$SIG_CONTENT" ]; then
+                SIGNATURE=$(echo "$SIG_CONTENT" | base64 -w 0 2>/dev/null || echo "$SIG_CONTENT" | base64 | tr -d '\n')
+                if [ -n "$SIGNATURE" ]; then
+                  CURRENT=$(cat /tmp/platforms_temp.json)
+                  echo "$CURRENT" | jq --arg platform "$PLATFORM" --arg url "$INSTALLER_URL" --arg signature "$SIGNATURE" \
+                    '.[$platform] = {url: $url, signature: $signature}' > /tmp/platforms_temp.json
+                fi
+              else
+                # No signature, exclude platform
+                CURRENT=$(cat /tmp/platforms_temp.json)
+                echo "$CURRENT" | jq --arg platform "$PLATFORM" 'del(.[$platform])' > /tmp/platforms_temp.json
+              fi
+            else
+              # No signature file found, exclude platform
+              CURRENT=$(cat /tmp/platforms_temp.json)
+              echo "$CURRENT" | jq --arg platform "$PLATFORM" 'del(.[$platform])' > /tmp/platforms_temp.json
+            fi
+          done
+
+          PLATFORMS=$(cat /tmp/platforms_temp.json)
+
+          # Build final updater JSON
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "$NOTES" \
+            --arg pub_date "$PUB_DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: $platforms}' > latest.json
+
+          cat latest.json
+
+      - name: Upload updater JSON to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+
+          RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO/releases/tags/$TAG_NAME" | jq -r '.id')
+
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @latest.json \
+            "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=latest.json"
