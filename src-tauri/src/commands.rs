@@ -539,7 +539,7 @@ pub fn get_db_info(id: String, section: String, state: State<AppState>) -> Resul
 // ─── Helpers ──────────────────────────────────────────────
 
 #[tauri::command]
-pub fn test_connection(host: String, port: u16, password: Option<String>, db: u8, state: State<AppState>) -> Result<String, String> {
+pub fn test_connection(host: String, port: u16, password: Option<String>, db: u8, _state: State<AppState>) -> Result<String, String> {
     let auth = match &password {
         Some(p) if !p.is_empty() => format!(":{}@", p),
         _ => String::new(),
