@@ -103,11 +103,15 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
 
   const activeConn = connections.find((c) => c.id === activeId);
 
+  // Sidebar container with animation
+  const sidebarContainer = (
+    <div
+      className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full overflow-hidden transition-[width] duration-200 ease-in-out shrink-0"
+      style={{ width: collapsed ? 48 : 240 }}
+    >
+      {collapsed ? (
   // Collapsed mode: narrow icon strip
-  let sidebarContent: JSX.Element;
-  if (collapsed) {
-    sidebarContent = (
-      <div className="w-12 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full items-center py-2 gap-1">
+        <div className="w-12 flex flex-col h-full items-center py-2 gap-1">
         {/* Expand button */}
         <button
           onClick={onToggleCollapse}
@@ -132,7 +136,11 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
         {connections.map((conn) => (
           <button
             key={conn.id}
-            onClick={() => onSelect(conn.id)}
+            onClick={() => {
+              if (activeId === conn.id) return;
+              if (connecting) return;
+              handleConnect(conn.id);
+            }}
             className={`p-1.5 rounded transition-colors relative ${
               activeId === conn.id
                 ? "bg-brand-700/20 dark:bg-brand-700/30 text-brand-600 dark:text-brand-400"
@@ -169,10 +177,9 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
           {locale === "zh-CN" ? "EN" : "中"}
         </button>
       </div>
-    );
-  } else {
-  sidebarContent = (
-    <div className="w-60 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+      ) : (
+  // Expanded mode
+      <div className="w-60 flex flex-col h-full">
       {/* Header */}
       <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
@@ -318,9 +325,10 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
           <span>{locale === "zh-CN" ? "EN" : "中文"}</span>
         </button>
       </div>
+      </div>
+      )}
     </div>
   );
-  }
 
   // Connection Form Modal (rendered outside sidebar for collapsed mode)
   const formModal = showForm && (
@@ -423,7 +431,7 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
 
   return (
     <>
-      {sidebarContent}
+      {sidebarContainer}
       {formModal}
     </>
   );
