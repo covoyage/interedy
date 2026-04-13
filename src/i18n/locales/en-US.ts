@@ -17,6 +17,8 @@ const enUS: TranslationKeys = {
     cancel: "Cancel",
     save: "Save",
     connectFail: "Connection failed",
+    connecting: "Connecting…",
+    connectTimeout: "Connection timed out. Please check your network or Redis address",
     database: "Database",
     testConnection: "Test Connection",
     testSuccess: "Connection successful",

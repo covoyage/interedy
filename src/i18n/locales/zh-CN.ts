@@ -16,6 +16,8 @@ const zhCN = {
     cancel: "取消",
     save: "保存",
     connectFail: "连接失败",
+    connecting: "连接中…",
+    connectTimeout: "连接超时，请检查网络或 Redis 地址",
     database: "数据库",
     testConnection: "测试连接",
     testSuccess: "连接成功",

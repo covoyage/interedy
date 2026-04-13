@@ -17,6 +17,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.workbuddy/
 
 # Environment
 .env

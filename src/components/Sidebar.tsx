@@ -140,8 +140,12 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
             }`}
             title={`${conn.name}\n${conn.host}:${conn.port}`}
           >
-            <Server size={16} />
-            {activeId === conn.id && (
+            {connecting === conn.id ? (
+              <Loader2 size={16} className="animate-spin text-brand-500" />
+            ) : (
+              <Server size={16} />
+            )}
+            {activeId === conn.id && connecting !== conn.id && (
               <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400" />
             )}
           </button>
@@ -210,44 +214,43 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
                 {conn.host}:{conn.port}
               </div>
             </div>
-            {connecting === conn.id && (
+            {connecting === conn.id ? (
               <Loader2 size={14} className="animate-spin text-brand-500 shrink-0" />
-            )}
-            <div className="hidden group-hover:flex items-center gap-0.5">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}
-                className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-              >
-                <Edit3 size={12} />
-              </button>
-              {activeId === conn.id ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDisconnect(conn.id); }}
-                  className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-yellow-500 dark:text-yellow-400"
-                >
-                  <Unplug size={12} />
-                </button>
-              ) : (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleConnect(conn.id); }}
-                  className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-green-500 dark:text-green-400"
-                  disabled={connecting === conn.id}
-                >
-                  <Plug size={12} />
-                </button>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(conn.id); }}
-                className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-red-400"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-            {activeId === conn.id && connecting !== conn.id && (
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 shrink-0 group-hover:hidden" />
-            )}
-            {connecting === conn.id && (
-              <Loader2 size={12} className="animate-spin text-brand-500 shrink-0 group-hover:hidden" />
+            ) : (
+              <>
+                <div className="hidden group-hover:flex items-center gap-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}
+                    className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    <Edit3 size={12} />
+                  </button>
+                  {activeId === conn.id ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDisconnect(conn.id); }}
+                      className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-yellow-500 dark:text-yellow-400"
+                    >
+                      <Unplug size={12} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleConnect(conn.id); }}
+                      className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-green-500 dark:text-green-400"
+                    >
+                      <Plug size={12} />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(conn.id); }}
+                    className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-red-400"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                {activeId === conn.id && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 shrink-0 group-hover:hidden" />
+                )}
+              </>
             )}
           </div>
         ))}

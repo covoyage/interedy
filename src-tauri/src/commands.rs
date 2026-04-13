@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::State;
 
 // ─── Types ─────────────────────────────────────────────────
@@ -125,21 +126,33 @@ pub fn list_connections(state: State<AppState>) -> Result<Vec<RedisConnection>, 
 }
 
 #[tauri::command]
-pub fn connect(id: String, state: State<AppState>) -> Result<u8, String> {
-    let conns = state.connections.lock().unwrap();
-    let conn = conns.iter().find(|c| c.id == id).ok_or("连接不存在")?.clone();
-    drop(conns);
+pub async fn connect(id: String, state: State<'_, AppState>) -> Result<u8, String> {
+    let (url, db) = {
+        let conns = state.connections.lock().unwrap();
+        let conn = conns.iter().find(|c| c.id == id).ok_or("连接不存在")?.clone();
+        (build_redis_url(&conn)?, conn.db)
+    };
 
-    let url = build_redis_url(&conn)?;
-    let client = redis::Client::open(url).map_err(|e| e.to_string())?;
-    let mut c = client.get_connection().map_err(|e| format!("连接失败: {}", e))?;
-    redis::cmd("PING")
-        .query::<String>(&mut c)
-        .map_err(|e| format!("PING 失败: {}", e))?;
+    let id_clone = id.clone();
 
-    let mut clients = state.clients.lock().unwrap();
-    clients.insert(id.clone(), (client, conn.db));
-    Ok(conn.db)
+    let client = tokio::task::spawn_blocking(move || -> Result<redis::Client, String> {
+        let client = redis::Client::open(url).map_err(|e| e.to_string())?;
+        let mut c = client
+            .get_connection_with_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("连接超时或失败: {}", e))?;
+        redis::cmd("PING")
+            .query::<String>(&mut c)
+            .map_err(|e| format!("PING 失败: {}", e))?;
+        Ok(client)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    {
+        let mut clients = state.clients.lock().unwrap();
+        clients.insert(id_clone, (client, db));
+    }
+    Ok(db)
 }
 
 #[tauri::command]
@@ -150,23 +163,33 @@ pub fn disconnect(id: String, state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn switch_db(id: String, db: u8, state: State<AppState>) -> Result<u8, String> {
-    let conns = state.connections.lock().unwrap();
-    let conn = conns.iter().find(|c| c.id == id).ok_or("连接不存在")?.clone();
-    drop(conns);
+pub async fn switch_db(id: String, db: u8, state: State<'_, AppState>) -> Result<u8, String> {
+    let url = {
+        let conns = state.connections.lock().unwrap();
+        let conn = conns.iter().find(|c| c.id == id).ok_or("连接不存在")?.clone();
+        let mut new_conn = conn.clone();
+        new_conn.db = db;
+        build_redis_url(&new_conn)?
+    };
 
-    // Build URL with the new db
-    let mut new_conn = conn.clone();
-    new_conn.db = db;
-    let url = build_redis_url(&new_conn)?;
-    let client = redis::Client::open(url).map_err(|e| e.to_string())?;
-    let mut c = client.get_connection().map_err(|e| format!("连接 db{} 失败: {}", db, e))?;
-    redis::cmd("PING")
-        .query::<String>(&mut c)
-        .map_err(|e| format!("PING 失败: {}", e))?;
+    let id_clone = id.clone();
+    let client = tokio::task::spawn_blocking(move || -> Result<redis::Client, String> {
+        let client = redis::Client::open(url).map_err(|e| e.to_string())?;
+        let mut c = client
+            .get_connection_with_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("连接 db{} 失败: {}", db, e))?;
+        redis::cmd("PING")
+            .query::<String>(&mut c)
+            .map_err(|e| format!("PING 失败: {}", e))?;
+        Ok(client)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
 
-    let mut clients = state.clients.lock().unwrap();
-    clients.insert(id, (client, db));
+    {
+        let mut clients = state.clients.lock().unwrap();
+        clients.insert(id_clone, (client, db));
+    }
     Ok(db)
 }
 
@@ -539,18 +562,24 @@ pub fn get_db_info(id: String, section: String, state: State<AppState>) -> Resul
 // ─── Helpers ──────────────────────────────────────────────
 
 #[tauri::command]
-pub fn test_connection(host: String, port: u16, password: Option<String>, db: u8, _state: State<AppState>) -> Result<String, String> {
+pub async fn test_connection(host: String, port: u16, password: Option<String>, db: u8) -> Result<String, String> {
     let auth = match &password {
         Some(p) if !p.is_empty() => format!(":{}@", p),
         _ => String::new(),
     };
     let url = format!("redis://{}{}:{}/{}", auth, host, port, db);
-    let client = redis::Client::open(url).map_err(|e| format!("URL 解析失败: {}", e))?;
-    let mut conn = client.get_connection().map_err(|e| format!("连接失败: {}", e))?;
-    redis::cmd("PING")
-        .query::<String>(&mut conn)
-        .map_err(|e| format!("PING 失败: {}", e))?;
-    Ok("PONG".to_string())
+    tokio::task::spawn_blocking(move || -> Result<String, String> {
+        let client = redis::Client::open(url).map_err(|e| format!("URL 解析失败: {}", e))?;
+        let mut conn = client
+            .get_connection_with_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("连接超时或失败: {}", e))?;
+        redis::cmd("PING")
+            .query::<String>(&mut conn)
+            .map_err(|e| format!("PING 失败: {}", e))?;
+        Ok("PONG".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn build_redis_url(conn: &RedisConnection) -> Result<String, String> {
