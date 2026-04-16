@@ -11,6 +11,9 @@
 <p align="center">
   <img src="screenshots/interedy-dark.png" alt="Main Window" style="max-width: 100%; height: auto;" />
 </p>
+<p align="center">
+  <img src="screenshots/interedy-dark-connected.png" alt="Main Window" style="max-width: 100%; height: auto;" />
+</p>
 
 ## Features
 

@@ -135,7 +135,7 @@ function AppContent() {
         ) : (
         <>
         {/* Key Tree */}
-        <div className="flex flex-col flex-shrink-0 bg-white dark:bg-gray-900" style={{ width: keyTreeWidth }}>
+        <div className="flex flex-col flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700" style={{ width: keyTreeWidth }}>
           <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t.keyTree.keys}</span>
             <div className="flex items-center gap-1">
