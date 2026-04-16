@@ -1,8 +1,16 @@
-# Interedy
+<p align="center">
+  <a href="https://github.com/covoyage/interedy">
+    <img width="200px" src="https://github.com/covoyage/interedy/raw/main/src-tauri/icons/icon.png">
+  </a>
+</p>
 
-一款基于 Tauri 2.0 构建的 Redis 桌面管理工具，轻量、快速、跨平台。
+**Interedy** -- 一款基于 Tauri 2.0 构建的 Redis 桌面管理工具，轻量、快速、跨平台。
 
 [English](./README.md)
+
+<p align="center">
+  <img src="screenshots/interedy-dark.png" alt="Main Window" style="max-width: 100%; height: auto;" />
+</p>
 
 ## 特性
 

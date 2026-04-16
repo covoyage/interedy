@@ -1,8 +1,16 @@
-# Interedy
+<p align="center">
+  <a href="https://github.com/covoyage/interedy">
+    <img width="200px" src="https://github.com/covoyage/interedy/raw/main/src-tauri/icons/icon.png">
+  </a>
+</p>
 
-A lightweight, fast, cross-platform Redis desktop manager built with Tauri 2.0.
+**Interedy** -- A lightweight, fast, cross-platform Redis desktop manager built with Tauri 2.0.
 
 [中文](./README.zh-CN.md)
+
+<p align="center">
+  <img src="screenshots/interedy-dark.png" alt="Main Window" style="max-width: 100%; height: auto;" />
+</p>
 
 ## Features
 
