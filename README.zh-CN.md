@@ -4,7 +4,7 @@
   </a>
 </p>
 
-**Interedy** -- 一款基于 Tauri 2.0 构建的 Redis 桌面管理工具，轻量、快速、跨平台。
+**Interedy** -- 一款轻量、快速、跨平台的 Redis 桌面管理工具。
 
 [English](./README.md)
 

@@ -4,7 +4,7 @@
   </a>
 </p>
 
-**Interedy** -- A lightweight, fast, cross-platform Redis desktop manager built with Tauri 2.0.
+**Interedy** -- A lightweight, fast, cross-platform Redis desktop manager.
 
 [中文](./README.zh-CN.md)
 

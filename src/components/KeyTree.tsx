@@ -162,7 +162,7 @@ export const KeyTree: React.FC<Props> = ({ connectionId, currentDB, onSelectKey,
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-850 flex flex-col h-full">
+    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col h-full">
       {/* Search bar */}
       <div className="p-2 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-1.5 min-w-0">
