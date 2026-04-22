@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Server, Plus, Trash2, Plug, Unplug, Database, Edit3, Sun, Moon, Languages, ChevronDown, Loader2, CheckCircle2, XCircle, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
@@ -93,6 +93,23 @@ export const Sidebar: React.FC<Props> = ({ connections, activeId, currentDB, onS
     }
     setConnecting(null);
   };
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    Object.entries(connectErrors).forEach(([id, msg]) => {
+      if (msg) {
+        const timer = setTimeout(() => {
+          setConnectErrors((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        }, 5000);
+        timers.push(timer);
+      }
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [connectErrors]);
 
   const handleDisconnect = async (id: string) => {
     await api.disconnect(id);
