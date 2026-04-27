@@ -38,6 +38,7 @@ const zhCN = {
     copyKey: "复制键名",
     loading: "加载中...",
     deleteKey: "删除 Key",
+    refresh: "刷新",
     ttl: "TTL",
     setTTL: "设置",
     neverExpire: "永不过期",

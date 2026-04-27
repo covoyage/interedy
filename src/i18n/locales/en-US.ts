@@ -37,6 +37,7 @@ const enUS: TranslationKeys = {
     copyKey: "Copy key name",
     loading: "Loading...",
     deleteKey: "Delete Key",
+    refresh: "Refresh",
     ttl: "TTL",
     setTTL: "Set",
     neverExpire: "Never expire",
